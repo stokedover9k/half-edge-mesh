@@ -7,7 +7,6 @@
 #include <iostream>
 #include <assert.h>
 #include <math.h>
-using namespace std;
 
 // typically F is float or double
 
@@ -15,7 +14,7 @@ template <class F> class CVec2T;
 
 // read a vector from a stream
 template <class F>
-istream& operator>> ( istream& is, CVec2T<F>& v) {
+std::istream& operator>> ( std::istream& is, CVec2T<F>& v) {
   is >> v.v[0];
   is >> v.v[1];
   return is;
@@ -89,12 +88,12 @@ public:
 
   // componentwise min and max
   CVec2T min( const CVec2T& o ) const
-    { F a = ::min( v[X], o.v[X] );
-      F b = ::min( v[Y], o.v[Y] );
+    { F a = std::min( v[X], o.v[X] );
+      F b = std::min( v[Y], o.v[Y] );
       return CVec2T( a, b); }
   CVec2T max( const CVec2T& o ) const
-    { F a = ::max( v[X], o.v[X] );
-      F b = ::max( v[Y], o.v[Y] );
+    { F a = std::max( v[X], o.v[X] );
+      F b = std::max( v[Y], o.v[Y] );
       return CVec2T( a, b); }
 
   F dot( const CVec2T& c ) const
@@ -107,7 +106,7 @@ public:
   F l1( void ) const
     { F a = fabs( v[X] ); a += fabs( v[Y] ); return a; }
   F linfty( void ) const
-    { F a = fabs( v[X] ); a = ::max( a, F(abs( v[Y] )) );
+    { F a = fabs( v[X] ); a = std::max( a, F(abs( v[Y] )) );
       return  a; }
   F l2( void ) const { return sqrt( dot() ); }
 
@@ -139,7 +138,7 @@ public:
 
 
 template <class F>
-ostream& operator<<( ostream& os, const CVec2T<F>& v) {
+std::ostream& operator<<( std::ostream& os, const CVec2T<F>& v) {
   return os << v(0) << " " << v(1);
 }
 

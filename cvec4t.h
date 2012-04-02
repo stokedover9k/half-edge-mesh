@@ -10,13 +10,13 @@ template <class T> class CVec4T;
 // after the class
 
 template <class T>
-istream& operator>>(istream& is, CVec4T<T>& v) {
+std::istream& operator>>(std::istream& is, CVec4T<T>& v) {
   is >> v.x() >> v.y() >> v.z() >> v.w();
   return is;
 }
 
 template <class T>
-ostream& operator<<(ostream& os, const CVec4T<T>& v) {
+std::ostream& operator<<(std::ostream& os, const CVec4T<T>& v) {
   return os << v(0) << " " << v(1) << " " << v(2) << " " << v(3);
 }
 

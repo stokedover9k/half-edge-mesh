@@ -9,7 +9,6 @@
 #include <math.h>
 //#include "cvec2t.h"
 
-using namespace std;
 
 // typically F is float or double
 
@@ -17,7 +16,7 @@ template <class F> class CVec3T;
 
 // read a vector from a stream
 template <class F>
-istream& operator>> ( istream& is, CVec3T<F>& v) {
+std::istream& operator>> ( std::istream& is, CVec3T<F>& v) {
   is >> v.v[0];
   is >> v.v[1];
   is >> v.v[2];
@@ -93,14 +92,14 @@ public:
 
   // componentwise min and max
   CVec3T min( const CVec3T& o ) const
-    { F a = ::min( v[X], o.v[X] );
-      F b = ::min( v[Y], o.v[Y] );
-      F c = ::min( v[Z], o.v[Z] );
+    { F a =std::min( v[X], o.v[X] );
+      F b =std::min( v[Y], o.v[Y] );
+      F c =std::min( v[Z], o.v[Z] );
       return CVec3T( a, b,c); }
   CVec3T max( const CVec3T& o ) const
-    { F a = ::max( v[X], o.v[X] );
-      F b = ::max( v[Y], o.v[Y] );
-      F c = ::max( v[Z], o.v[Z] );
+    { F a = std::max( v[X], o.v[X] );
+      F b = std::max( v[Y], o.v[Y] );
+      F c = std::max( v[Z], o.v[Z] );
       return CVec3T( a, b,c); }
 
   F dot( const CVec3T& c ) const
@@ -113,8 +112,8 @@ public:
   F l1( void ) const
     { F a = fabs( v[X] ); a += fabs( v[Y] );a += fabs( v[Z] ); return a; }
   F linfty( void ) const
-    { F a = fabs( v[X] ); a = ::max( a, F(abs( v[Y] )) );
-    a = ::max( a, F(abs( v[Z] )) );
+    { F a = fabs( v[X] ); a = std::max( a, F(abs( v[Y] )) );
+    a = std::max( a, F(abs( v[Z] )) );
       return  a; }
   F l2( void ) const { return sqrt( dot() ); }
   
@@ -141,7 +140,7 @@ public:
 
 
 template <class F>
-ostream& operator<<( ostream& os, const CVec3T<F>& v) {
+std::ostream& operator<<( std::ostream& os, const CVec3T<F>& v) {
   return os << v(0) << " " << v(1) << " " << v(2);
 }
 

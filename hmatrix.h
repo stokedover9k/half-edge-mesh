@@ -290,7 +290,7 @@ class HMatrix {
 template <class F> inline HMatrix<F> operator*(F s, const HMatrix<F>& M) { 
   return M*s;
 }
-template <class F> inline ostream& operator<< ( ostream& os, const HMatrix<F>& M ) { 
+template <class F> inline std::ostream& operator<< ( std::ostream& os, const HMatrix<F>& M ) { 
   os << "[ " << M(0,0)  << " " << M(0,1)  << " " << M(0,2)  << " " <<  M(0,3)  << "; ";
   os         << M(1,0)  << " " << M(1,1)  << " " << M(1,2)  << " " <<  M(1,3)  << "; ";
   os         << M(2,0)  << " " << M(2,1)  << " " << M(2,2)  << " " <<  M(2,3)  << "; ";
