@@ -37,6 +37,7 @@ int main( int argc, char* argv[] ) {
   glutReshapeFunc(Input::Reshape);
   glutMouseFunc(Input::MouseClick);
   glutMotionFunc(Input::MouseMotion);
+  glutKeyboardFunc(Input::Keyboard);
  
   // this is an infinite loop get event - dispatch event which never returns
   try {

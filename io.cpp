@@ -43,6 +43,11 @@ Vec3f Input::ScreenToWorld(const int wind_id, int x, int y) {
   return Vec3f(world_x,world_y,world_z);
 }
 
+/*
+  center: center of the sphere (trackball)
+  pscreen: point on screen
+  psphere: destination: point on sphere?
+ */
 bool Input::SpherePoint(const Vec3f& center, float r, 
 			const Vec3f& pscreen, Vec3f& psphere) { 
   Vec3f v = (pscreen- View::CameraPosition).dir(); 
@@ -56,6 +61,7 @@ bool Input::SpherePoint(const Vec3f& center, float r,
 }
 
 void Input::MouseClick (int button, int state, int x, int y) {
+
   y = Params::WindowHeight - y-1;
   if(state == GLUT_DOWN) {
     Vec3f psphere; 
@@ -71,7 +77,8 @@ void Input::MouseClick (int button, int state, int x, int y) {
   }
 }
 
-void Input::MouseMotion(int x, int y) { 
+void Input::MouseMotion(int x, int y) {
+
   y = Params::WindowHeight - y-1;
   Vec3f psphere;
 
@@ -94,7 +101,16 @@ void Input::MouseMotion(int x, int y) {
   glutPostRedisplay();
 }
 
-//-----------------------------------------------------------------------------
+void Input::Keyboard(unsigned char key, int x, int y) {
+  if( key == 'n' )
+    {
+      Draw::toggle_mode(Draw::NORMALS_MODE);
+    }
+  
+  glutPostRedisplay();
+}
+
+///////////////////////////////////////////////////////////////////////////////
 
 void Draw::draw_scene() {
   glMatrixMode(GL_MODELVIEW); 
@@ -125,7 +141,7 @@ void Draw::draw_scene() {
 
     glEnable(GL_LIGHTING);
     
-    for( vector<Face*>::const_iterator f_itr = mesh_itr->faces().begin();
+    for( list<Face*>::const_iterator f_itr = mesh_itr->faces().begin();
 	 f_itr != mesh_itr->faces().end(); f_itr++ ) {
 
       Edge *first_e = (*f_itr)->edge();
@@ -151,6 +167,8 @@ void Draw::draw_scene() {
   glutSwapBuffers();
 }
 
+int Draw::get_mode(void) { return _DRAW_MODE; }
+
 void Draw::set_mode(int bits) {
   if( bits & PER_FACE_NORMALS && bits & PER_VERTEX_NORMALS )
     throw "Draw::set_mode(int): Conflicting modes requested.";
@@ -159,6 +177,13 @@ void Draw::set_mode(int bits) {
 
   if( bits & PER_FACE_NORMALS   ) _DRAW_MODE &= ~PER_VERTEX_NORMALS;
   if( bits & PER_VERTEX_NORMALS ) _DRAW_MODE &= ~PER_FACE_NORMALS;
+}
+
+void Draw::toggle_mode(int bits) {
+  if( bits != NORMALS_MODE )
+    throw "Draw::toggle_mode(int): Invalid mode requested.";
+  
+  _DRAW_MODE ^= bits;  //bitwise XOR assignment
 }
 
 std::list<MeshObj> Draw::meshes;

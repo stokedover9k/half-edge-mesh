@@ -29,14 +29,16 @@ class MeshObj {
   MeshObj(const char* filename);
 
   // getters for constant iterators to mesh elements
-  const std::vector<Edge*>& edges(void) const;
-  const std::vector<Vert*>& verts(void) const;
-  const std::vector<Face*>& faces(void) const;
+  const std::list<Edge*>& edges(void) const;
+  const std::list<Vert*>& verts(void) const;
+  const std::list<Face*>& faces(void) const;
   
  private:
-  std::vector<Vert*> _verts;
-  std::vector<Edge*> _edges;
-  std::vector<Face*> _faces;
+  std::list<Vert*> _verts;
+  std::list<Edge*> _edges;
+  std::list<Face*> _faces;
+  // faces are ID'd by a unique RGBA value stored as a CVec4T
+  std::map<CVec4T<unsigned char>, Face*> _color_to_face;
 
   void construct(const MeshLoad::OBJMesh &);
 };

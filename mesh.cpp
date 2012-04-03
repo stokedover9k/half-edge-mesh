@@ -19,28 +19,32 @@ MeshObj::MeshObj(const char* filename) {
   delete m;
 }
 
-const std::vector<Edge*>& MeshObj::edges(void) const  { return _edges; }
-const std::vector<Vert*>& MeshObj::verts(void) const  { return _verts; }
-const std::vector<Face*>& MeshObj::faces(void) const  { return _faces; }
+const std::list<Edge*>& MeshObj::edges(void) const  { return _edges; }
+const std::list<Vert*>& MeshObj::verts(void) const  { return _verts; }
+const std::list<Face*>& MeshObj::faces(void) const  { return _faces; }
 
 void MeshObj::construct(const MeshLoad::OBJMesh& m) {
+  std::vector<Vert*> verts;
   for( std::vector<Vec3f>::const_iterator i = m.pos.begin(); 
        i != m.pos.end(); i++ )
-    _verts.push_back( new Vert(*i) );
+    verts.push_back( new Vert(*i) );
   
   typedef pair<int, int> IndPair;
   map<IndPair, Edge*> edge_map;
   map<IndPair, Edge*>::iterator edge_map_itr;
-  
 
-  
+  _color_to_face.clear();
+  unsigned char face_key[] = {0,0,0,0};
+
+
+
   for( int i=0; i<m.face_startidx.size(); i++ ) {
     int endind = 
       ( i < m.face_startidx.size() - 1 ) 
       ? m.face_startidx[i+1] : m.faces.size();
     
     Face* face = new Face();
-    Edge* first_edge = new Edge(_verts[m.faces[m.face_startidx[i]].posIdx],face);
+    Edge* first_edge = new Edge(verts[m.faces[m.face_startidx[i]].posIdx],face);
     Edge* current_edge = first_edge;
     face->edge() = first_edge;
 
@@ -49,7 +53,7 @@ void MeshObj::construct(const MeshLoad::OBJMesh& m) {
       {
 	int faces_ind = (j == endind) ? m.face_startidx[i] : j;
 	current_edge->next() = ( j == endind ) ? 
-	  first_edge : new Edge(_verts[m.faces[j].posIdx], face);
+	  first_edge : new Edge(verts[m.faces[j].posIdx], face);
 	current_edge->vert()->edge() = current_edge->next();
 	_edges.push_back(current_edge);
 	
@@ -67,6 +71,8 @@ void MeshObj::construct(const MeshLoad::OBJMesh& m) {
 	current_edge = current_edge->next();
       }
 
+    *reinterpret_cast<uint32_t*>(face_key) += 1;  //skipping black (0,0,0,0)
+    _color_to_face[CVec4T<unsigned char>(face_key)] = face;
     face->normal() = face->calculate_normal();
     _faces.push_back(face);
   }
@@ -91,8 +97,10 @@ void MeshObj::construct(const MeshLoad::OBJMesh& m) {
     edge_map.erase(edge_map_itr);
   }
 
+  _verts.insert(_verts.begin(), verts.begin(), verts.end());
+
   // computer per-vertex normals
-  for( vector<Vert*>::iterator vert_itr = _verts.begin(); 
+  for( list<Vert*>::iterator vert_itr = _verts.begin(); 
        vert_itr != _verts.end(); vert_itr++ ) 
     {
 
