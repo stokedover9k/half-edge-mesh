@@ -32,13 +32,19 @@ class MeshObj {
   const std::list<Edge*>& edges(void) const;
   const std::list<Vert*>& verts(void) const;
   const std::list<Face*>& faces(void) const;
+
+  static uint32_t color_to_i(const ColorVec4& c);  //convert color vec to an int
+  const ColorVec4 face_to_color(Face *) const;
+  bool face_is_color(Face*, const ColorVec4&) const;
+  bool face_is_color_i(Face*, uint32_t) const;
   
  private:
   std::list<Vert*> _verts;
   std::list<Edge*> _edges;
   std::list<Face*> _faces;
   // faces are ID'd by a unique RGBA value stored as a CVec4T
-  std::map<CVec4T<unsigned char>, Face*> _color_to_face;
+  std::vector<Face*> _color_to_face;
+  std::map<Face*, ColorVec4> _face_to_color;
 
   void construct(const MeshLoad::OBJMesh &);
 };

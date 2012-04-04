@@ -19,7 +19,7 @@ params.o: params.cpp params.h
 mesh.o: mesh.cpp mesh.h params.o $(INCLUDES)
 	$(CC) $(CFLAGS) $<
 
-io.o: io.cpp io.h params.o $(INCLUDES)
+io.o: io.cpp io.h mesh.o params.o $(INCLUDES)
 	$(CC) $(CFLAGS) $<
 
 clean:

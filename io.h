@@ -6,6 +6,10 @@
 #include "headers.h"
 #include "mesh.h"
 
+#ifndef SELECTED_FACE_COLOR
+#define SELECTED_FACE_COLOR Vec3f(1,0,0)
+#endif
+
 using std::cout;
 using std::cin;
 using std::endl;
@@ -20,11 +24,19 @@ class Draw {
 
     NORMALS_MODE = PER_FACE_NORMALS|PER_VERTEX_NORMALS,
   };
+  enum {
+    NONE      = 0,
+    TRACKBALL = 1,
+    SELECTED  = 1<<1,
+  };
 
+  //next two functions call draw_mesh() with right parameters
+  /* draw_scene(): draws the lit and properly colored objects */
   static void draw_scene();
+  /* draw_selectable(): draws faces with unique colors (doesn't swap buffers) */
+  static void draw_selectable(); 
 
-  static std::list<MeshObj> meshes;
-  static std::list<MeshObj>::iterator mesh_itr;
+  static MeshObj mesh;
 
   static int get_mode(void);
   static void set_mode(int mode_bits);
@@ -32,12 +44,16 @@ class Draw {
 
  private:
   static int _DRAW_MODE;
+  static void draw_mesh(int also_draw=NONE);
 };
 
 //-----------------------------------------------------------------------------
 
 class Input {
  public:
+  static ColorVec4 selected_face_color;
+  static Face* selected_face;
+
   static Vec3f CurrentPsphere;
   static Vec3f NewPsphere;
 

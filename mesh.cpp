@@ -23,6 +23,18 @@ const std::list<Edge*>& MeshObj::edges(void) const  { return _edges; }
 const std::list<Vert*>& MeshObj::verts(void) const  { return _verts; }
 const std::list<Face*>& MeshObj::faces(void) const  { return _faces; }
 
+uint32_t MeshObj::color_to_i(const ColorVec4& c) {
+  return c.x() | c.y()<<8 | c.z()<<16 | c.w()<<24; }
+
+const ColorVec4 MeshObj::face_to_color(Face *face_ptr) const {
+  return _face_to_color.find(face_ptr)->second; }
+
+bool MeshObj::face_is_color(Face* f, const ColorVec4& c) const {
+  return face_is_color_i(f, color_to_i(c)); }
+
+bool MeshObj::face_is_color_i(Face* f, uint32_t c) const {
+  return _color_to_face[c] == f ? true : false; }
+
 void MeshObj::construct(const MeshLoad::OBJMesh& m) {
   std::vector<Vert*> verts;
   for( std::vector<Vec3f>::const_iterator i = m.pos.begin(); 
@@ -34,8 +46,9 @@ void MeshObj::construct(const MeshLoad::OBJMesh& m) {
   map<IndPair, Edge*>::iterator edge_map_itr;
 
   _color_to_face.clear();
-  unsigned char face_key[] = {0,0,0,0};
-
+  _color_to_face = vector<Face*>(m.face_startidx.size());
+  _face_to_color.clear();
+  ColorVec4 face_key(0,0,0,0);
 
 
   for( int i=0; i<m.face_startidx.size(); i++ ) {
@@ -71,8 +84,49 @@ void MeshObj::construct(const MeshLoad::OBJMesh& m) {
 	current_edge = current_edge->next();
       }
 
-    *reinterpret_cast<uint32_t*>(face_key) += 1;  //skipping black (0,0,0,0)
-    _color_to_face[CVec4T<unsigned char>(face_key)] = face;
+    // account for big endian and little endian differences
+    uint32_t x = face_key.x();
+    uint32_t y = face_key.y();
+    uint32_t z = face_key.z();
+    uint32_t w = face_key.w();
+
+    /*
+    uint32_t i_face_key = 0;
+    i_face_key = x | (y<<8) | (z<<16) | (w<<24);
+    i_face_key += 20;
+    */
+
+    uint32_t i_face_key = (face_key.x()     |
+			   face_key.y()<<8  |
+			   face_key.z()<<16 |
+			   face_key.w()<<24  ) + 1; //4632165;
+    //*/
+
+    face_key = ColorVec4(i_face_key & 0xFF,
+			 i_face_key >>  8 & 0xFF,
+			 i_face_key >> 16 & 0xFF,
+			 i_face_key >> 24 & 0xFF);
+    //*/
+    /*
+    face_key.x() = i_face_key & 0xFF;
+    face_key.y() = i_face_key & (0xFF<<8);
+    cout << (i_face_key & (0xFF << 8)) << "... ";
+    cout << x << ","
+	 << y << ","
+	 << z << ","
+	 << w << "  --  "
+	 << i_face_key << endl;
+    */
+    /*
+    cout << (int)face_key.x() << ","
+	 << (int)face_key.y() << ","
+	 << (int)face_key.z() << ","
+	 << (int)face_key.w() << "  --  "
+	 << i_face_key << endl;
+    //*/
+
+    _color_to_face[i_face_key] = face;
+    _face_to_color[face] = face_key;
     face->normal() = face->calculate_normal();
     _faces.push_back(face);
   }

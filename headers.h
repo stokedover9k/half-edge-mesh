@@ -17,6 +17,8 @@
 typedef CVec3T<float> Vec3f;
 typedef CVec4T<float> Vec4f;
 
+typedef CVec4T<GLubyte> ColorVec4;
+
 #include "params.h"
 
 #endif

@@ -11,7 +11,16 @@ namespace View {
   static HMatrix<float> ExaminerRotation;
 };
 
-//-----------------------------------------------------------------------------
+///////////////////////////////////////////////////////////////////////////////
+// STATIC VARIABLES  
+
+ColorVec4 Input::selected_face_color(0,0,0,0);
+Face* Input::selected_face = NULL;
+
+MeshObj Draw::mesh;
+int Draw::_DRAW_MODE = Draw::PER_FACE_NORMALS;
+
+///////////////////////////////////////////////////////////////////////////////
 
 Vec3f Input::CurrentPsphere;
 Vec3f Input::NewPsphere;
@@ -61,17 +70,39 @@ bool Input::SpherePoint(const Vec3f& center, float r,
 }
 
 void Input::MouseClick (int button, int state, int x, int y) {
-
   y = Params::WindowHeight - y-1;
-  if(state == GLUT_DOWN) {
-    Vec3f psphere; 
-    if(SpherePoint(View::SphereCenter, View::SphereRadius,
-		   ScreenToWorld(Params::MainWindow, x, y), psphere)) {
-      CurrentPsphere = psphere;
-      NewPsphere = psphere;
-    }
-    glutPostRedisplay();
-  } 
+
+  if( state == GLUT_DOWN ) 
+    {
+      Draw::draw_selectable();
+
+      unsigned char pRGBA[4];
+   
+      glReadBuffer( GL_BACK );
+      glReadPixels( x, y, //where to start read
+		    1, 1, //how many to read in x and y direction
+		    GL_RGBA, GL_UNSIGNED_BYTE, &pRGBA);
+
+      //ColorVec4 v(pRGBA);
+      cout << "color: " 
+	   << (int)pRGBA[0] << "," 
+	   << (int)pRGBA[1] << "," 
+	   << (int)pRGBA[2] << "," 
+	   << (int)pRGBA[3] << ","
+	   << endl;
+      
+      selected_face_color = ColorVec4(pRGBA[0], pRGBA[1], pRGBA[2], pRGBA[3]);
+
+
+      //-------------------------------------------------------------------------
+      Vec3f psphere; 
+      if(SpherePoint(View::SphereCenter, View::SphereRadius,
+		     ScreenToWorld(Params::MainWindow, x, y), psphere)) {
+	CurrentPsphere = psphere;
+	NewPsphere = psphere;
+      }
+      glutPostRedisplay();
+    } 
   if(state == GLUT_UP) { 
     CurrentPsphere = NewPsphere;
   }
@@ -113,58 +144,98 @@ void Input::Keyboard(unsigned char key, int x, int y) {
 ///////////////////////////////////////////////////////////////////////////////
 
 void Draw::draw_scene() {
+  glClearColor(0,0,0,0);
+  glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+
   glMatrixMode(GL_MODELVIEW); 
   glLoadIdentity();
   gluLookAt(View::CameraPosition.x(),
 	    View::CameraPosition.y(),
 	    View::CameraPosition.z(),
 	    0,0,0,0,1,0);
-
-  glClearColor( 0.6, 0.6,0.6,0);
-  glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-
+  
   glEnable(GL_DEPTH_TEST);
-  // enable automatic rescaling of normals to unit length
   glEnable(GL_NORMALIZE);
-  // enable two lights
+
   glEnable(GL_LIGHT0);
-  //  glEnable(GL_LIGHT1);
-  // directional lights (w=0) along z axis
+  glEnable(GL_LIGHT1);
   glLightfv(GL_LIGHT0,GL_DIFFUSE,  Vec4f(1,  1,  1, 1));
   glLightfv(GL_LIGHT0,GL_POSITION, Vec4f(0,  0,  1, 0));
   glLightfv(GL_LIGHT1,GL_DIFFUSE,  Vec4f(1,  1,  1, 1));
   glLightfv(GL_LIGHT1,GL_POSITION, Vec4f(0,  0, -1, 0));
 
+  glLightModelf(GL_LIGHT_MODEL_TWO_SIDE,0);
+  glEnable(GL_LIGHTING);
+  glShadeModel(GL_SMOOTH);
+  glEnable(GL_ALPHA_TEST); //for alpha value: RGBA
+
+  draw_mesh( TRACKBALL | SELECTED );
+
+  glDisable(GL_LIGHTING);
+
+  glutSwapBuffers();
+}
+
+void Draw::draw_selectable() {
+  glClearColor(0.0,0.0,0.0,0);
+  glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+
+  glDisable(GL_TEXTURE_2D);
+  glEnable(GL_ALPHA_TEST); //for alpha value: RGBA
+
+  glDisable(GL_LIGHTING);
+
+  draw_mesh(NONE);
+}
+
+void Draw::draw_mesh(int also_draw) {
+  uint32_t selected_color = MeshObj::color_to_i(Input::selected_face_color);
+  bool selected = false;
+
   glPushMatrix();
     glMultMatrixf(View::ExaminerRotation);
-    glutWireSphere(View::SphereRadius,10,10);
-
-    glEnable(GL_LIGHTING);
     
-    for( list<Face*>::const_iterator f_itr = mesh_itr->faces().begin();
-	 f_itr != mesh_itr->faces().end(); f_itr++ ) {
+    if( also_draw & TRACKBALL )
+      glutWireSphere(View::SphereRadius,10,10);
+    
+    for( list<Face*>::const_iterator f_itr = mesh.faces().begin();
+	 f_itr != mesh.faces().end(); f_itr++ ) {
 
       Edge *first_e = (*f_itr)->edge();
       Edge *e_ptr = first_e;
       
+      if( also_draw & SELECTED ) {
+	if( mesh.face_is_color_i(*f_itr, selected_color) ) {
+	  glDisable(GL_LIGHTING);
+	  glColor3fv( SELECTED_FACE_COLOR );
+	  selected = true;
+	}
+      }
+      else {
+	glColor4ubv( mesh.face_to_color(*f_itr) );
+      }
+
       glBegin(GL_POLYGON);
         if( _DRAW_MODE & PER_FACE_NORMALS ) glNormal3fv((*f_itr)->normal());
 	do {
 	  if( _DRAW_MODE & PER_VERTEX_NORMALS ) 
 	    glNormal3fv(e_ptr->vert()->normal());
 
-	  if( e_ptr->next() == NULL ) throw "next null";
+	  if( e_ptr->next() == NULL ) throw "Draw::draw_mesh: e->next == null";
 	  glVertex3fv(e_ptr->vert()->loc());
 	  e_ptr = e_ptr->next();
 
 	} while ( e_ptr != first_e );
       glEnd();
+
+      if( selected ) {  //dealing with the selected face
+	selected = false;
+	also_draw ^= SELECTED;
+	glEnable(GL_LIGHTING);
+      }
     }
 
-    glDisable(GL_LIGHTING);
   glPopMatrix();
-
-  glutSwapBuffers();
 }
 
 int Draw::get_mode(void) { return _DRAW_MODE; }
@@ -186,6 +257,3 @@ void Draw::toggle_mode(int bits) {
   _DRAW_MODE ^= bits;  //bitwise XOR assignment
 }
 
-std::list<MeshObj> Draw::meshes;
-std::list<MeshObj>::iterator Draw::mesh_itr = Draw::meshes.begin();
-int Draw::_DRAW_MODE = Draw::PER_FACE_NORMALS | Draw::PER_VERTEX_NORMALS;
