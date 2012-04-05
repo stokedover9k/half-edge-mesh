@@ -11,8 +11,8 @@ int main( int argc, char* argv[] ) {
     {
       Draw::set_mode(Draw::PER_FACE_NORMALS);
       
-      MeshLoad::OBJMesh *m = MeshLoad::readOBJ("./obj/dodecahedron.obj");
-      //MeshLoad::OBJMesh *m = MeshLoad::readOBJ("./obj/spaceship.obj");
+      //MeshLoad::OBJMesh *m = MeshLoad::readOBJ("./obj/dodecahedron.obj");
+      MeshLoad::OBJMesh *m = MeshLoad::readOBJ("./obj/spaceship.obj");
       Draw::mesh = *m;
     }
   catch (const char* err_str) 
