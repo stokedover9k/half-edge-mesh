@@ -14,7 +14,7 @@ namespace View {
 ///////////////////////////////////////////////////////////////////////////////
 // STATIC VARIABLES  
 
-ColorVec4 Input::selected_face_color(0,0,0,0);
+uint32_t Input::selected_face_color(0);
 Face* Input::selected_face = NULL;
 
 MeshObj Draw::mesh;
@@ -77,21 +77,15 @@ void Input::MouseClick (int button, int state, int x, int y) {
       Draw::draw_selectable();
 
       unsigned char pRGBA[4];
-   
       glReadBuffer( GL_BACK );
-      glReadPixels( x, y, //where to start read
-		    1, 1, //how many to read in x and y direction
-		    GL_RGBA, GL_UNSIGNED_BYTE, &pRGBA);
+      glReadPixels( x, y, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, &pRGBA);
+      selected_face_color = 
+	//MeshObj::color_to_i(ColorVec4(pRGBA[0], pRGBA[1], pRGBA[2], pRGBA[3]));
+	MeshObj::color_to_i(pRGBA);
 
-      //ColorVec4 v(pRGBA);
-      cout << "color: " 
-	   << (int)pRGBA[0] << "," 
-	   << (int)pRGBA[1] << "," 
-	   << (int)pRGBA[2] << "," 
-	   << (int)pRGBA[3] << ","
-	   << endl;
+      cout << "color: " << (int)pRGBA[0] << "," << (int)pRGBA[1] << "," 
+	   << (int)pRGBA[2] << "," << (int)pRGBA[3] << ","<< endl;
       
-      selected_face_color = ColorVec4(pRGBA[0], pRGBA[1], pRGBA[2], pRGBA[3]);
 
 
       //-------------------------------------------------------------------------
@@ -133,9 +127,12 @@ void Input::MouseMotion(int x, int y) {
 }
 
 void Input::Keyboard(unsigned char key, int x, int y) {
-  if( key == 'n' )
+  switch( key )
     {
-      Draw::toggle_mode(Draw::NORMALS_MODE);
+    case 'n':  Draw::toggle_mode(Draw::NORMALS_MODE);              break;
+    case 'x':  Draw::mesh.face_to_triangles(selected_face_color);  break;
+
+    default: ;
     }
   
   glutPostRedisplay();
@@ -157,6 +154,7 @@ void Draw::draw_scene() {
   glEnable(GL_DEPTH_TEST);
   glEnable(GL_NORMALIZE);
 
+  glEnable(GL_LIGHTING);
   glEnable(GL_LIGHT0);
   glEnable(GL_LIGHT1);
   glLightfv(GL_LIGHT0,GL_DIFFUSE,  Vec4f(1,  1,  1, 1));
@@ -165,9 +163,10 @@ void Draw::draw_scene() {
   glLightfv(GL_LIGHT1,GL_POSITION, Vec4f(0,  0, -1, 0));
 
   glLightModelf(GL_LIGHT_MODEL_TWO_SIDE,0);
-  glEnable(GL_LIGHTING);
   glShadeModel(GL_SMOOTH);
   glEnable(GL_ALPHA_TEST); //for alpha value: RGBA
+
+  glEnable(GL_COLOR_MATERIAL);
 
   draw_mesh( TRACKBALL | SELECTED );
 
@@ -182,40 +181,42 @@ void Draw::draw_selectable() {
 
   glDisable(GL_TEXTURE_2D);
   glEnable(GL_ALPHA_TEST); //for alpha value: RGBA
-
+  
   glDisable(GL_LIGHTING);
 
-  draw_mesh(NONE);
+  draw_mesh(SELECTABLE);
 }
 
 void Draw::draw_mesh(int also_draw) {
-  uint32_t selected_color = MeshObj::color_to_i(Input::selected_face_color);
   bool selected = false;
-
   glPushMatrix();
     glMultMatrixf(View::ExaminerRotation);
     
-    if( also_draw & TRACKBALL )
-      glutWireSphere(View::SphereRadius,10,10);
-    
+    glColor3fv( DEFAULT_FACE_COLOR );
+
     for( list<Face*>::const_iterator f_itr = mesh.faces().begin();
 	 f_itr != mesh.faces().end(); f_itr++ ) {
 
       Edge *first_e = (*f_itr)->edge();
       Edge *e_ptr = first_e;
-      
+
       if( also_draw & SELECTED ) {
-	if( mesh.face_is_color_i(*f_itr, selected_color) ) {
-	  glDisable(GL_LIGHTING);
-	  glColor3fv( SELECTED_FACE_COLOR );
+	//if( mesh.face_is_color_i(*f_itr, selected_color) ) {
+	if( selected == false &&
+	    mesh.face_is_color(*f_itr, Input::selected_face_color) ) {
 	  selected = true;
+	  glColor3fv( SELECTED_FACE_COLOR );
 	}
+	else {
+	  glColor3fv( DEFAULT_FACE_COLOR );
+	} 
       }
-      else {
-	glColor4ubv( mesh.face_to_color(*f_itr) );
+      else if( also_draw & SELECTABLE ) {
+	glColor4ubv( MeshObj::i_to_color(mesh.face_to_color(*f_itr)) );
       }
 
       glBegin(GL_POLYGON);
+
         if( _DRAW_MODE & PER_FACE_NORMALS ) glNormal3fv((*f_itr)->normal());
 	do {
 	  if( _DRAW_MODE & PER_VERTEX_NORMALS ) 
@@ -227,12 +228,11 @@ void Draw::draw_mesh(int also_draw) {
 
 	} while ( e_ptr != first_e );
       glEnd();
+    }
 
-      if( selected ) {  //dealing with the selected face
-	selected = false;
-	also_draw ^= SELECTED;
-	glEnable(GL_LIGHTING);
-      }
+    if( also_draw & TRACKBALL ) {
+      glColor3fv( DEFAULT_FACE_COLOR );
+      glutWireSphere(View::SphereRadius,10,10);
     }
 
   glPopMatrix();

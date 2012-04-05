@@ -26,6 +26,10 @@ inline bool zero( F f ) {
   return( f < F(DBL_EPSILON) );
 }
 
+template <class T>
+bool operator== (const CVec2T<T>& v1, const CVec2T<T>& v2) {
+  return v1(0) == v2(0) && v1(1) == v2(1);
+}
 
 template <class F>
 class CVec2T {

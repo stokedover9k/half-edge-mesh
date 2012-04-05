@@ -6,7 +6,9 @@
 #include "headers.h"
 #include "mesh.h"
 
-#ifndef SELECTED_FACE_COLOR
+#ifndef __DEFAULT_COLORS__
+#define __DEFAULT_COLORS__
+#define DEFAULT_FACE_COLOR  Vec3f(0.8,0.8,0)
 #define SELECTED_FACE_COLOR Vec3f(1,0,0)
 #endif
 
@@ -25,9 +27,10 @@ class Draw {
     NORMALS_MODE = PER_FACE_NORMALS|PER_VERTEX_NORMALS,
   };
   enum {
-    NONE      = 0,
-    TRACKBALL = 1,
-    SELECTED  = 1<<1,
+    NONE       = 0,
+    TRACKBALL  = 1,
+    SELECTED   = 1<<1,
+    SELECTABLE = 1<<2,
   };
 
   //next two functions call draw_mesh() with right parameters
@@ -37,7 +40,7 @@ class Draw {
   static void draw_selectable(); 
 
   static MeshObj mesh;
-
+  
   static int get_mode(void);
   static void set_mode(int mode_bits);
   static void toggle_mode(int mode_bits);  //mode_bits must be NORMALS_MODE
@@ -51,7 +54,7 @@ class Draw {
 
 class Input {
  public:
-  static ColorVec4 selected_face_color;
+  static uint32_t selected_face_color;
   static Face* selected_face;
 
   static Vec3f CurrentPsphere;

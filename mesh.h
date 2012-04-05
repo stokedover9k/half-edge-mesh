@@ -34,18 +34,25 @@ class MeshObj {
   const std::list<Face*>& faces(void) const;
 
   static uint32_t color_to_i(const ColorVec4& c);  //convert color vec to an int
-  const ColorVec4 face_to_color(Face *) const;
-  bool face_is_color(Face*, const ColorVec4&) const;
-  bool face_is_color_i(Face*, uint32_t) const;
+  static ColorVec4 i_to_color(uint32_t c);         //convert an int to a color vec
+
+  uint32_t face_to_color(Face *) const;
+  bool face_is_color(Face*, uint32_t) const;
+  //bool face_is_color_i(Face*, uint32_t) const;
+
+  Vert* split_edge(Edge *);       //returns the new vector which splits the edge
+  void face_to_triangles(Face *);
+  void face_to_triangles(uint32_t);
   
  private:
   std::list<Vert*> _verts;
   std::list<Edge*> _edges;
   std::list<Face*> _faces;
   // faces are ID'd by a unique RGBA value stored as a CVec4T
-  std::vector<Face*> _color_to_face;
-  std::map<Face*, ColorVec4> _face_to_color;
+  std::map<uint32_t, Face*> _color_to_face;
+  std::map<Face*, uint32_t> _face_to_color;
 
+  void _register_face(Face*);
   void construct(const MeshLoad::OBJMesh &);
 };
 
@@ -91,6 +98,7 @@ class Face {
   const Vec3f& normal(void) const;
 
   Vec3f calculate_normal(void) const;
+  unsigned int edge_count(void) const;
 
   //setter 
   Edge*& edge(void);

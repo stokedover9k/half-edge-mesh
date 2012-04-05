@@ -23,6 +23,10 @@ std::istream& operator>> ( std::istream& is, CVec3T<F>& v) {
   return is;
 }
 
+template <class T>
+bool operator== (const CVec3T<T>& v1, const CVec3T<T>& v2) {
+  return v1(0) == v2(0) && v1(1) == v2(1) && v1(2) == v2(2);
+}
 
 template <class F>
 class CVec3T {
