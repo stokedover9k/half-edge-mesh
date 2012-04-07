@@ -2,6 +2,7 @@
 #define __MESH_H__
 
 #include <cstddef>         //for NULL
+#include <algorithm>
 #include <list>
 #include <vector>
 #include <utility>
@@ -33,32 +34,45 @@ class MeshObj {
   const std::list<Vert*>& verts(void) const;
   const std::list<Face*>& faces(void) const;
 
-  static uint32_t color_to_i(const ColorVec4& c);  //convert color vec to an int
+  /* FACE-COLOR edcoding interface */
+  static uint32_t color_to_i(const ColorVec4& c);  //convert a color vec to an int
   static ColorVec4 i_to_color(uint32_t c);         //convert an int to a color vec
-
   uint32_t face_to_color(Face *) const;
   bool face_is_color(Face*, uint32_t) const;
-  //bool face_is_color_i(Face*, uint32_t) const;
+
+  /* ALTERATION INTERFACE */
+  void convert_to_triangles(void);
+  bool delete_face(uint32_t color);   //returns true on success, false on failure
 
   Vert* split_edge(Edge *);       //returns the new vector which splits the edge
-  void face_to_triangles(Face *);
+  void face_to_triangles(Face *);   //use the version with uint32_t arg instead
   void face_to_triangles(uint32_t);
   
+  bool validate(void);
+
  private:
-  std::list<Vert*> _verts;
-  std::list<Edge*> _edges;
-  std::list<Face*> _faces;
+  std::list<Vert*> _verts;    typedef std::list<Vert*>::iterator VertItr;
+  std::list<Edge*> _edges;    typedef std::list<Edge*>::iterator EdgeItr;
+  std::list<Face*> _faces;    typedef std::list<Face*>::iterator FaceItr;
+  
   // faces are ID'd by a unique RGBA value stored as a CVec4T
   std::map<uint32_t, Face*> _color_to_face;
   std::map<Face*, uint32_t> _face_to_color;
 
   void _register_face(Face*);
+  void _remove_edge(Edge*);
+  void _remove_vert(Vert*);
+  void _remove_face(Face*);
+
   void construct(const MeshLoad::OBJMesh &);
+
 };
 
 //-----------------------------------------------------------------------------
 
 class Edge {
+  enum EdgeType { HALF_EDGE, DOUBLE_EDGE, OPPOSITE_EDGE };
+    
  public:
   Edge();
   Edge( Vert* v, Face* f=NULL, Edge* n=NULL, Edge* opp=NULL );
@@ -69,6 +83,10 @@ class Edge {
   Edge*  opp(void) const;
   Face* face(void) const;
   Vert* vert(void) const;
+
+  Edge* prev(void) const;
+
+  bool external(EdgeType = DOUBLE_EDGE);
 
   //setter return "this" pointer
   Edge *& next(void);

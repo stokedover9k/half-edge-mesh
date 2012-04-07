@@ -39,6 +39,90 @@ bool MeshObj::face_is_color(Face* f, uint32_t c) const {
   return _face_to_color.find(f)->second == c; 
 }
 
+void MeshObj::convert_to_triangles(void) {
+  FaceItr i = _faces.begin();
+  FaceItr e = --_faces.end();
+  while(true) {
+    if( i != e )
+      face_to_triangles(*(i++));
+    else {
+      face_to_triangles(*i);
+      break;
+    }
+  }
+}
+
+bool MeshObj::delete_face(uint32_t color) {
+  Face* f = _color_to_face[color];
+  if( f == NULL ) throw "MeshObj::delete_face(uint32_t): no face matched color.";
+  
+  // check deletability
+  Edge* first = f->edge();  
+  Edge* e = first;
+  Edge* anchor = NULL;
+  do {
+    Edge* c = e;
+    e = e->next();
+    if( c->opp()->face() == NULL ) //edge on the boundary
+      continue;
+    else anchor = c;
+    if( c->vert()->edge()->face() != NULL ) //vertex not on the boundary
+      continue;
+    if( c->next()->opp()->face() == NULL ) //next edge on the boundary
+      continue;
+
+    return false;
+  } while( e != first );
+
+  // point edges into the dark abyss
+  Edge* n;
+  if( anchor == NULL ) { // no adjacent faces exist
+    do {
+      n = e->next();
+      _remove_vert(e->vert());
+      _remove_edge(e->opp());
+      _remove_edge(e);
+      e = n;
+    } while( e != first );
+  }
+  else {
+    first = anchor;
+    e = anchor;
+    
+    do {
+      cout << "loop" << endl;
+      n = e->next();
+      if( !e->external() ) {
+	if( n != first && n->external() ) {
+	  e->next() = e->vert()->edge();
+	}
+	else {
+	  e->vert()->edge() = n;
+	}
+      }
+      else {
+	if( n != first && n->external() ) {
+	  _remove_vert(e->vert());
+	}
+	else {
+	  e->opp()->prev()->next() = n;
+	  e->vert()->edge() = n;
+	}
+	_remove_edge(e->opp());
+	_remove_edge(e);
+      }
+      e->face() = NULL;
+      e = n;
+    } while( e != first );
+  }
+
+  _color_to_face.erase(color);
+  _face_to_color.erase(f);
+  _remove_face(f);
+
+  return true;
+}
+
 Vert* MeshObj::split_edge(Edge *e) {
   Edge* o = e->opp();
   Vert* v = new Vert((e->vert()->loc() + o->vert()->loc())/2);
@@ -66,6 +150,21 @@ void MeshObj::_register_face(Face *f) {
   _faces.push_back(f);
 }
 
+void MeshObj::_remove_edge(Edge* e) {
+  EdgeItr i = std::find(_edges.begin(), _edges.end(), e);
+  _edges.erase(i);
+}
+
+void MeshObj::_remove_vert(Vert* v) {
+  VertItr i = std::find(_verts.begin(), _verts.end(), v);
+  _verts.erase(i);
+}
+
+void MeshObj::_remove_face(Face* f) {
+  FaceItr i = std::find(_faces.begin(), _faces.end(), f);
+  _faces.erase(i);
+}
+
 void MeshObj::face_to_triangles(uint32_t c) {
   face_to_triangles(_color_to_face[c]);
 }
@@ -79,16 +178,18 @@ void MeshObj::face_to_triangles(Face *F0) {
       Edge* e1 = e0->next();
       Edge* e2 = e1->next();
 
-      Face* f  = new Face(e2);
+      Face* f  = new Face(e1);
       f->normal() = f->calculate_normal();
       _register_face(f);
 
       //---------New Edge------- vert - face ------ next - opp -
       Edge* e3 = new Edge(          o,     f,         e1, NULL  );
       Edge* e4 = new Edge( e2->vert(),    F0, e2->next(), e3    );
-      e3->opp()  = e4;
       e0->next() = e4;
       e2->next() = e3;
+      e3->opp()  = e4;
+      e1->face() = f;
+      e2->face() = f;
       _edges.push_back(e3);
       _edges.push_back(e4);
     }
@@ -105,8 +206,6 @@ void MeshObj::construct(const MeshLoad::OBJMesh& m) {
   map<IndPair, Edge*>::iterator edge_map_itr;
 
   _color_to_face.clear();
-  //_color_to_face = vector<Face*>(m.face_startidx.size()+1);
-  //_color_to_face[0] = NULL;
   _face_to_color.clear();
 
   for( int i=0; i<m.face_startidx.size(); i++ ) {
@@ -163,10 +262,12 @@ void MeshObj::construct(const MeshLoad::OBJMesh& m) {
   // 2. link boundary edges to next
   for( edge_map_itr = edge_map.begin();
        edge_map_itr != edge_map.end(); edge_map_itr++ ) {
-    edge_map_itr->second->opp()->next() = edge_map_itr->second->vert()->edge();
-    _edges.push_back(edge_map_itr->second);
-    edge_map.erase(edge_map_itr);
+    edge_map_itr->second->opp()->next() = 
+      edge_map_itr->second->opp()->vert()->edge();
+    _edges.push_back(edge_map_itr->second->opp());
+    //edge_map.erase(edge_map_itr);
   }
+  edge_map.clear();
 
   _verts.insert(_verts.begin(), verts.begin(), verts.end());
 
@@ -174,7 +275,6 @@ void MeshObj::construct(const MeshLoad::OBJMesh& m) {
   for( list<Vert*>::iterator vert_itr = _verts.begin(); 
        vert_itr != _verts.end(); vert_itr++ ) 
     {
-
       Vec3f normal(0,0,0);
       list<Face*> faces = (*vert_itr)->list_faces();
       for(list<Face*>::const_iterator face_itr = faces.begin();
@@ -199,10 +299,10 @@ Edge::Edge( Vert* v, Face* f, Edge* n, Edge* o )
 Edge::~Edge() {  }
 
 //getters
-Edge*   Edge::next(void) const  { return _next;   }
-Edge*   Edge::opp (void) const  { return _opp;    }
-Face*   Edge::face(void) const  { return _face;   }
-Vert*   Edge::vert(void) const  { return _vert;   }
+Edge* Edge::next(void) const  { return _next;   }
+Edge* Edge::opp (void) const  { return _opp;    }
+Face* Edge::face(void) const  { return _face;   }
+Vert* Edge::vert(void) const  { return _vert;   }
 
 //setter return "this" pointer
 Edge *& Edge::next(void)  { return _next; }
@@ -210,9 +310,27 @@ Edge *& Edge::opp (void)  { return _opp;  }
 Face *& Edge::face(void)  { return _face; }
 Vert *& Edge::vert(void)  { return _vert; }
 
+Edge* Edge::prev(void) const {
+  Edge* e;
+  Vert* v = _opp->vert();
+  for( e = _opp; e->_next != this; e = e->_next->_opp ) {
+    if( e->vert() != v ) throw "Edge:prev(): unexpected vertex found.";
+  }
+  return e;
+}
+
+bool Edge::external(EdgeType t) {
+  switch( t ) 
+    {
+    case HALF_EDGE:     return _face == NULL;
+    case DOUBLE_EDGE:   return _face == NULL || _opp->_face == NULL;
+    case OPPOSITE_EDGE: return _opp->_face == NULL;
+    default: throw "Edge::on_border(Edge::EdgeType): invalid type provided.";
+    }
+}
+
 std::ostream& operator << (std::ostream& s, const Edge& e) {
-  s << *e.vert();
-  return s;
+  s << *e.vert();    return s;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -234,7 +352,7 @@ Vec3f& Face::normal(void) { return _normal; }
 
 Vec3f Face::calculate_normal(void) const {
   Edge* ne = _edge->next();         //next edge
-  Edge* nne = ne->next();            //next next edge
+  Edge* nne = ne->next();           //next next edge
   Vec3f v1 = nne->vert()->loc() - ne->vert()->loc();
   Vec3f v2 = edge()->vert()->loc() - ne->vert()->loc();
   return cross(v1, v2);
@@ -278,6 +396,60 @@ list<Face*> Vert::list_faces(void) const {
 }
 
 std::ostream& operator << (std::ostream& s, const Vert& v) {
-  s << v._loc;
-  return s;
+  s << v._loc;  return s;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+bool MeshObj::validate(void) {
+  bool ok = true;
+  for( VertItr i = _verts.begin(); i != _verts.end(); i++ ) {
+    Vert* v = *i;
+    cout << "\nVert: " << v << " || ";
+
+    // check vert's edge.opp points back to vert
+    if( v->edge()->opp()->vert() != v ) {
+      ok = false; cout << "x ";
+    } else cout << ". ";
+  }
+
+  for( EdgeItr i = _edges.begin(); i != _edges.end(); i++ ) {
+    Edge* e = *i;
+    cout << "\nEdge: " << e << " || ";
+    
+    // check border's next
+    if( e->face() == NULL && e->next()->face() != NULL ) {
+      ok = false;  cout << "x ";
+    } else cout << ". ";
+    
+    // check border's vert
+    if( e->face() == NULL && e->vert()->edge()->face() != NULL ) {
+      ok = false;  cout << "x ";
+    } else cout << ". ";
+    
+    // check border's next = vert.edge
+    if( e->face() == NULL && e->next() != e->vert()->edge() ) {
+      ok = false;  cout << "x ";
+    } else cout << ". ";
+
+    // check opposites
+    if( e->opp()->opp() != e ) {
+      ok = false;  cout << "x ";
+    } else cout << ". ";
+
+    // check face == .next.face
+    if( e->face() != e->next()->face() ) {
+      ok = false;  cout << "x ";
+    } else cout << ". ";
+
+    if( e->face() == NULL ) {
+      cout << ":";  std::flush(cout);
+      for( Edge* t = e->next(); t->next() != e; t = t->next() ) ;
+      cout << ".";
+    } else cout << "NA";
+  }    
+
+
+  cout << endl;
+  return ok;
 }

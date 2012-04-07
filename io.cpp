@@ -130,7 +130,22 @@ void Input::Keyboard(unsigned char key, int x, int y) {
   switch( key )
     {
     case 'n':  Draw::toggle_mode(Draw::NORMALS_MODE);              break;
-    case 'x':  Draw::mesh.face_to_triangles(selected_face_color);  break;
+    case 'x':  
+      Draw::mesh.face_to_triangles(selected_face_color);
+      if( !Draw::mesh.validate() ) 
+	throw "Input::Keyboard(): face split broke mesh.";
+      break;
+    case 't':  
+      Draw::mesh.convert_to_triangles();                  
+      if( !Draw::mesh.validate() ) 
+	throw "Input::Keyboard(): all faces split broke mesh.";
+      break;
+    case 'd':  
+      if( Draw::mesh.delete_face(selected_face_color) ) {
+	if( ! Draw::mesh.validate() ) throw "Input::Keyboard(): delete broke mesh";
+      }
+      break;
+    case 'v':  Draw::mesh.validate();                              break;
 
     default: ;
     }

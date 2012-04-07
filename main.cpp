@@ -7,13 +7,17 @@
 
 
 int main( int argc, char* argv[] ) {
+  const char* mesh_file;
+
+  // get name of object file (defaults to ./obj/spaceship.obj)
+  if( argc > 1 )  mesh_file = argv[1];
+  else            mesh_file = "./obj/spaceship.obj";
+
   try 
     {
-      Draw::set_mode(Draw::PER_FACE_NORMALS);
-      
-      //MeshLoad::OBJMesh *m = MeshLoad::readOBJ("./obj/dodecahedron.obj");
-      MeshLoad::OBJMesh *m = MeshLoad::readOBJ("./obj/spaceship.obj");
+      MeshLoad::OBJMesh *m = MeshLoad::readOBJ(mesh_file);
       Draw::mesh = *m;
+      Draw::set_mode(Draw::PER_FACE_NORMALS);
     }
   catch (const char* err_str) 
     {
