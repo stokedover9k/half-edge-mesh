@@ -90,7 +90,6 @@ bool MeshObj::delete_face(uint32_t color) {
     e = anchor;
     
     do {
-      cout << "loop" << endl;
       n = e->next();
       if( !e->external() ) {
 	if( n != first && n->external() ) {
@@ -126,8 +125,15 @@ bool MeshObj::delete_face(uint32_t color) {
 void MeshObj::subdivide_faces(void) {
   std::list<Vert*> new_verts;
   split_all_edges(new_verts);
-  //split_edge(*_edges.begin());
-  
+
+  for( std::list<Vert*>::iterator v = new_verts.begin(); 
+       v != new_verts.end(); v++ )
+    {
+      bisect_subdiv_triangle(*v, (*v)->edge()->opp()->next());
+      if( (*v)->edge()->face() != NULL ) {
+	bisect_subdiv_triangle(*v, (*v)->edge());
+      }
+    }
 }
 
 Vert* MeshObj::split_edge(Edge *e) {
@@ -155,18 +161,46 @@ Vert* MeshObj::split_edge(Edge *e) {
 }
 
 void MeshObj::split_all_edges(list<Vert*>& v) {
-  std::set<Edge*> processed;
-  std::set<Edge*>::iterator pr_itr;
-  EdgeRevItr edges_end = _edges.rend();
-  for( EdgeRevItr i = _edges.rbegin(); i != edges_end; i++ ) {
-    pr_itr = processed.find( *i );
-    if( pr_itr == processed.end() ) {
-      processed.insert( (*i)->opp() );
-      v.push_back( split_edge( *i ) );
-    }
-    else
-      processed.erase( pr_itr );
+  std::set<Edge*> edges(_edges.begin(), _edges.end());
+  std::set<Edge*>::iterator itr;
+  
+  while( edges.size() > 0 ) {
+    itr = edges.begin();
+    edges.erase((*itr)->opp());
+    v.push_back( split_edge(*itr) );
+    edges.erase(itr);
   }
+}
+
+void MeshObj::bisect_subdiv_triangle(Vert* v, Edge* e0) {  
+  Edge* e1 = e0->next();
+  Edge* e2 = e1->next()->next();
+
+  if( e2->next()->next()->next() == e0            //6 edges case
+      && e2->next()->next()->vert() == v ) {
+    e1 = e1->next();
+    e2 = e2->next()->next();
+  }
+  else if( e2->next() != e0 || e2->vert() != v )  //not 4 edges case
+    throw "MeshObj::bisect_subdiv_triangle(): unexpected surface.";
+
+  e1->face()->edge() = e1;
+  Face* f2 = new Face(e2);
+  Edge* e3 = new Edge(e2->vert(), e1->face(), e2->next(), NULL);
+  Edge* e4 = new Edge(e1->vert(),         f2, e1->next(),   e3);
+  e3->opp() = e4;
+
+  _edges.push_back(e3);
+  _edges.push_back(e4);
+
+  e1->next() = e3;
+  e2->next() = e4;
+
+  for( e2 = e4->next(); e2 != e4; e2 = e2->next() )
+    e2->face() = f2;
+
+  f2->normal() = f2->calculate_normal();
+  _register_face(f2);
 }
 
 void MeshObj::_register_face(Face *f) {
@@ -206,8 +240,6 @@ void MeshObj::face_to_triangles(Face *F0) {
       Edge* e2 = e1->next();
 
       Face* f  = new Face(e1);
-      f->normal() = f->calculate_normal();
-      _register_face(f);
 
       //---------New Edge------- vert - face ------ next - opp -
       Edge* e3 = new Edge(          o,     f,         e1, NULL  );
@@ -217,6 +249,9 @@ void MeshObj::face_to_triangles(Face *F0) {
       e3->opp()  = e4;
       e1->face() = f;
       e2->face() = f;
+
+      f->normal() = f->calculate_normal();
+      _register_face(f);
       _edges.push_back(e3);
       _edges.push_back(e4);
     }
@@ -302,16 +337,6 @@ void MeshObj::construct(const MeshLoad::OBJMesh& m) {
   for( list<Vert*>::iterator vert_itr = _verts.begin(); 
        vert_itr != _verts.end(); vert_itr++ ) 
     {
-      /*
-      Vec3f normal(0,0,0);
-      list<Face*> faces = (*vert_itr)->list_faces();
-      for(list<Face*>::const_iterator face_itr = faces.begin();
-	  face_itr != faces.end(); face_itr++ )
-	{
-	  normal += (*face_itr)->normal();
-	}
-      (*vert_itr)->normal() = normal.dir();
-      */
       (*vert_itr)->normal() = (*vert_itr)->calculate_normal();
     }
 }
@@ -324,15 +349,15 @@ Edge::Edge() : _next(NULL), _opp(NULL), _face(NULL), _vert(NULL)
 
 Edge::Edge( Vert* v, Face* f, Edge* n, Edge* o ) 
   : _vert(v), _next(n), _opp(o), _face(f)
-{  }
+{ }
 
 Edge::~Edge() {  }
 
 //getters
-Edge* Edge::next(void) const  { return _next;   }
-Edge* Edge::opp (void) const  { return _opp;    }
-Face* Edge::face(void) const  { return _face;   }
-Vert* Edge::vert(void) const  { return _vert;   }
+Edge* Edge::next(void) const  { return _next; }
+Edge* Edge::opp (void) const  { return _opp;  }
+Face* Edge::face(void) const  { return _face; }
+Vert* Edge::vert(void) const  { return _vert; }
 
 //setter return "this" pointer
 Edge *& Edge::next(void)  { return _next; }
@@ -458,6 +483,11 @@ bool MeshObj::validate(void) {
     Edge* e = *i;
     cout << "\nEdge: " << e << " || ";
     
+    // check pointing to self
+    if( e->next() == e ) {
+      ok = false;  cout << "x ";
+    } else cout << ". ";
+
     // check border's next
     if( e->face() == NULL && e->next()->face() != NULL ) {
       ok = false;  cout << "x ";
@@ -467,7 +497,7 @@ bool MeshObj::validate(void) {
     if( e->face() == NULL && e->vert()->edge()->face() != NULL ) {
       ok = false;  cout << "x ";
     } else cout << ". ";
-    
+
     // check border's next = vert.edge
     if( e->face() == NULL && e->next() != e->vert()->edge() ) {
       ok = false;  cout << "x ";
@@ -483,13 +513,28 @@ bool MeshObj::validate(void) {
       ok = false;  cout << "x ";
     } else cout << ". ";
 
-    if( e->face() == NULL ) {
+    if( e->face() == NULL ) { //|| e->opp()->face() == NULL ) {
       cout << ":";  std::flush(cout);
-      for( Edge* t = e->next(); t->next() != e; t = t->next() ) ;
+      for( Edge* t = e->next(); t->next() != e; t = t->next() ) 
       cout << ".";
     } else cout << "NA";
-  }    
+  }
 
+  for( FaceItr i = _faces.begin(); i != _faces.end(); i++ ) {
+    Face* f = *i;
+    cout << "\nFace: " << f << " ";
+
+    Edge* e = f->edge(); 
+    do {
+      if( e->face() != f ) { cout << "x"; ok = false; }
+      else cout << ".";  
+      std::flush(cout);
+      e = e->next();
+    } while(e != f->edge());
+  }  
+  cout << "\nface count: " << _faces.size();
+  cout << "\nedge count: " << _edges.size();
+  cout << "\nvert count: " << _verts.size();
 
   cout << endl;
   return ok;

@@ -145,17 +145,13 @@ void Input::Keyboard(unsigned char key, int x, int y) {
       }
       break;
     case 's':
-      cout << "convert to triangles: ";  flush(cout);
       Draw::mesh.convert_to_triangles();                  
       if( !Draw::mesh.validate() ) 
 	throw "Input::Keyboard(): all faces split (for Loop subdivision) "
 	  "broke mesh.";
-      cout << "success\nsubdivision running..." << endl;
       Draw::mesh.subdivide_faces();
-      cout << "checking... ";  flush(cout);
       if( !Draw::mesh.validate() ) 
 	throw "Input::Keyboard(): Loop subdivision broke mesh.";   
-      cout << "success" << endl;
                                                                    break;
     case 'v':  Draw::mesh.validate();                              break;
 

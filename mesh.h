@@ -54,6 +54,12 @@ class MeshObj {
   /* splits all edges and puts the newly created vertices into the list (arg 1)
    */
   void split_all_edges(list<Vert*>&);
+
+  /* Bisects the triangle on the Edge side of the Vertex.
+   * Expects 6 or 4 sides to the figure.
+   */
+  void bisect_subdiv_triangle(Vert*, Edge*);
+
   void face_to_triangles(Face *);   //use the version with uint32_t arg instead
   void face_to_triangles(uint32_t);
   
