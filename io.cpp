@@ -78,7 +78,7 @@ void Input::MouseClick (int button, int state, int x, int y) {
 
       unsigned char pRGBA[4];
       glReadBuffer( GL_BACK );
-      glReadPixels( x, y, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, &pRGBA);
+      glReadPixels( x, y, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, pRGBA );
       selected_face_color = 
 	//MeshObj::color_to_i(ColorVec4(pRGBA[0], pRGBA[1], pRGBA[2], pRGBA[3]));
 	MeshObj::color_to_i(pRGBA);
@@ -133,18 +133,30 @@ void Input::Keyboard(unsigned char key, int x, int y) {
     case 'x':  
       Draw::mesh.face_to_triangles(selected_face_color);
       if( !Draw::mesh.validate() ) 
-	throw "Input::Keyboard(): face split broke mesh.";
-      break;
+	throw "Input::Keyboard(): face split broke mesh.";         break;
     case 't':  
       Draw::mesh.convert_to_triangles();                  
       if( !Draw::mesh.validate() ) 
-	throw "Input::Keyboard(): all faces split broke mesh.";
-      break;
+	throw "Input::Keyboard(): all faces split broke mesh.";    break;
     case 'd':  
       if( Draw::mesh.delete_face(selected_face_color) ) {
-	if( ! Draw::mesh.validate() ) throw "Input::Keyboard(): delete broke mesh";
+	if( ! Draw::mesh.validate() ) 
+	  throw "Input::Keyboard(): delete broke mesh";
       }
       break;
+    case 's':
+      cout << "convert to triangles: ";  flush(cout);
+      Draw::mesh.convert_to_triangles();                  
+      if( !Draw::mesh.validate() ) 
+	throw "Input::Keyboard(): all faces split (for Loop subdivision) "
+	  "broke mesh.";
+      cout << "success\nsubdivision running..." << endl;
+      Draw::mesh.subdivide_faces();
+      cout << "checking... ";  flush(cout);
+      if( !Draw::mesh.validate() ) 
+	throw "Input::Keyboard(): Loop subdivision broke mesh.";   
+      cout << "success" << endl;
+                                                                   break;
     case 'v':  Draw::mesh.validate();                              break;
 
     default: ;
@@ -207,8 +219,6 @@ void Draw::draw_mesh(int also_draw) {
   glPushMatrix();
     glMultMatrixf(View::ExaminerRotation);
     
-    glColor3fv( DEFAULT_FACE_COLOR );
-
     for( list<Face*>::const_iterator f_itr = mesh.faces().begin();
 	 f_itr != mesh.faces().end(); f_itr++ ) {
 
@@ -224,7 +234,7 @@ void Draw::draw_mesh(int also_draw) {
 	}
 	else {
 	  glColor3fv( DEFAULT_FACE_COLOR );
-	} 
+	}
       }
       else if( also_draw & SELECTABLE ) {
 	glColor4ubv( MeshObj::i_to_color(mesh.face_to_color(*f_itr)) );
@@ -240,7 +250,7 @@ void Draw::draw_mesh(int also_draw) {
 	  if( e_ptr->next() == NULL ) throw "Draw::draw_mesh: e->next == null";
 	  glVertex3fv(e_ptr->vert()->loc());
 	  e_ptr = e_ptr->next();
-
+	  
 	} while ( e_ptr != first_e );
       glEnd();
     }

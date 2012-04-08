@@ -123,12 +123,19 @@ bool MeshObj::delete_face(uint32_t color) {
   return true;
 }
 
+void MeshObj::subdivide_faces(void) {
+  std::list<Vert*> new_verts;
+  split_all_edges(new_verts);
+  //split_edge(*_edges.begin());
+  
+}
+
 Vert* MeshObj::split_edge(Edge *e) {
   Edge* o = e->opp();
   Vert* v = new Vert((e->vert()->loc() + o->vert()->loc())/2);
 
   e->next() = new Edge(e->vert(), e->face(), e->next(), o);
-  o->next() = new Edge(o->vert(), o->face(), o->next(), o);
+  o->next() = new Edge(o->vert(), o->face(), o->next(), e);
   e->vert() = v;
   o->vert() = v;
   _edges.push_back(e->next());
@@ -137,9 +144,29 @@ Vert* MeshObj::split_edge(Edge *e) {
   e->opp() = o->next();
   o->opp() = e->next();
   
-  v->edge() = o->face() == NULL ? o->next() : e->next();
+  v->edge() = (o->face() == NULL) ? o->next() : e->next();
+  v->normal() = v->calculate_normal();
   _verts.push_back(v);
+
+  if( e->next()->opp()->next()->opp() != e )
+    throw "MeshObj::split_edge(Edge*): invalid cycle.";
+
   return v;
+}
+
+void MeshObj::split_all_edges(list<Vert*>& v) {
+  std::set<Edge*> processed;
+  std::set<Edge*>::iterator pr_itr;
+  EdgeRevItr edges_end = _edges.rend();
+  for( EdgeRevItr i = _edges.rbegin(); i != edges_end; i++ ) {
+    pr_itr = processed.find( *i );
+    if( pr_itr == processed.end() ) {
+      processed.insert( (*i)->opp() );
+      v.push_back( split_edge( *i ) );
+    }
+    else
+      processed.erase( pr_itr );
+  }
 }
 
 void MeshObj::_register_face(Face *f) {
@@ -275,6 +302,7 @@ void MeshObj::construct(const MeshLoad::OBJMesh& m) {
   for( list<Vert*>::iterator vert_itr = _verts.begin(); 
        vert_itr != _verts.end(); vert_itr++ ) 
     {
+      /*
       Vec3f normal(0,0,0);
       list<Face*> faces = (*vert_itr)->list_faces();
       for(list<Face*>::const_iterator face_itr = faces.begin();
@@ -283,6 +311,8 @@ void MeshObj::construct(const MeshLoad::OBJMesh& m) {
 	  normal += (*face_itr)->normal();
 	}
       (*vert_itr)->normal() = normal.dir();
+      */
+      (*vert_itr)->normal() = (*vert_itr)->calculate_normal();
     }
 }
 
@@ -383,6 +413,17 @@ Edge*        Vert::edge  (void) const  { return _edge;   }
 Vec3f& Vert::loc   (void) { return _loc;    }
 Vec3f& Vert::normal(void) { return _normal; }
 Edge*& Vert::edge  (void) { return _edge;   }
+
+Vec3f Vert::calculate_normal(void) const {
+  Vec3f n(0,0,0);
+  list<Face*> faces = list_faces();
+  for(list<Face*>::const_iterator face_itr = faces.begin();
+      face_itr != faces.end(); face_itr++ )
+    {
+      n += (*face_itr)->normal();
+    }
+  return n;
+}
 
 list<Face*> Vert::list_faces(void) const {
   list<Face*> l;
