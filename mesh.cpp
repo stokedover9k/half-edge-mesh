@@ -52,6 +52,175 @@ void MeshObj::convert_to_triangles(void) {
   }
 }
 
+void MeshObj::subdivide_faces(void) {
+  // split all edges
+  std::list<Vert*> new_verts;
+  split_all_edges(new_verts);
+
+  // split all triangles into 4 triangles
+  std::list<Edge*> to_flip;
+  for( std::list<Vert*>::iterator v = new_verts.begin(); 
+       v != new_verts.end(); v++ )
+    {
+      bisect_subdiv_triangle(*v, (*v)->edge()->opp()->next(), to_flip);
+      if( (*v)->edge()->face() != NULL ) {
+	bisect_subdiv_triangle(*v, (*v)->edge(), to_flip);
+      }
+    }
+
+  // Edge Flip for appropriate edges
+  for( std::list<Edge*>::iterator i = to_flip.begin();
+       i != to_flip.end(); i++ )
+    {
+      _edge_flip(*i);
+    }
+}
+
+void MeshObj::split_all_edges(std::list<Vert*>& v) {
+  std::set<Edge*> edges(_edges.begin(), _edges.end());
+  std::set<Edge*>::iterator itr;
+  
+  while( edges.size() > 0 ) {
+    itr = edges.begin();
+    edges.erase((*itr)->opp());
+    v.push_back( split_edge(*itr) );
+    edges.erase(itr);
+  }
+}
+
+Vert* MeshObj::split_edge(Edge *e) {
+  Edge* o = e->opp();
+  Vert* v = new Vert((e->vert()->loc() + o->vert()->loc())/2);
+
+  e->next() = new Edge(e->vert(), e->face(), e->next(), o);
+  o->next() = new Edge(o->vert(), o->face(), o->next(), e);
+  e->vert() = v;
+  o->vert() = v;
+  _edges.push_back(e->next());
+  _edges.push_back(o->next());
+
+  e->opp() = o->next();
+  o->opp() = e->next();
+  
+  v->edge() = (o->face() == NULL) ? o->next() : e->next();
+  v->normal() = v->calculate_normal();
+  _verts.push_back(v);
+
+  if( e->next()->opp()->next()->opp() != e )
+    throw "MeshObj::split_edge(Edge*): invalid cycle.";
+
+  return v;
+}
+
+void MeshObj::bisect_subdiv_triangle(Vert* v, Edge* e0, 
+				     std::list<Edge*>& to_flip) {
+  bool six_case = false;
+  Edge* e1 = e0->next();
+  Edge* e2 = e1->next()->next();
+
+  if( e2->next()->next()->next() == e0            //6 edges case
+      && e2->next()->next()->vert() == v ) {
+    e1 = e1->next();
+    e2 = e2->next()->next();
+    six_case = true;
+  }
+  else if( e2->next() != e0 || e2->vert() != v )  //not 4 edges case
+    throw "MeshObj::bisect_subdiv_triangle(): unexpected surface.";
+
+  e1->face()->edge() = e1;
+  Face* f2 = new Face(e2);
+  Edge* e3 = new Edge(e2->vert(), e1->face(), e2->next(), NULL);
+  Edge* e4 = new Edge(e1->vert(),         f2, e1->next(),   e3);
+  e3->opp() = e4;
+
+  if( six_case ) to_flip.push_back(e3);
+  _edges.push_back(e3);
+  _edges.push_back(e4);
+
+  e1->next() = e3;
+  e2->next() = e4;
+
+  for( e2 = e4->next(); e2 != e4; e2 = e2->next() )
+    e2->face() = f2;
+
+  f2->normal() = f2->calculate_normal();
+  _register_face(f2);
+}
+
+void MeshObj::_edge_flip(Edge* e1) {
+  Edge* e2 = e1->opp();
+  Edge* e11 = e1->next();  Edge* e12 = e11->next();
+  Edge* e21 = e2->next();  Edge* e22 = e21->next();
+  
+  e1->next() = e22;  e1->vert() = e21->vert();
+  e2->next() = e12;  e2->vert() = e11->vert();
+
+  e11->next() = e1;
+  e12->next() = e21;  e12->face() = e21->face();
+  e21->next() = e2;
+  e22->next() = e11;  e22->face() = e11->face();
+
+  e12->face()->edge() = e12;
+  e22->face()->edge() = e22;
+
+  if( e12->vert()->edge() == e1 )  e12->vert()->edge() = e21;
+  if( e22->vert()->edge() == e2 )  e22->vert()->edge() = e11;
+}
+
+void MeshObj::_register_face(Face *f) {
+  uint32_t key = (_color_to_face.size() == 0) ?
+    1 : _color_to_face.rbegin()->first + 1;
+  _color_to_face[key] = f;
+  _face_to_color[f] = key;
+  _faces.push_back(f);
+}
+
+void MeshObj::_remove_edge(Edge* e) {
+  EdgeItr i = std::find(_edges.begin(), _edges.end(), e);
+  _edges.erase(i);
+}
+
+void MeshObj::_remove_vert(Vert* v) {
+  VertItr i = std::find(_verts.begin(), _verts.end(), v);
+  _verts.erase(i);
+}
+
+void MeshObj::_remove_face(Face* f) {
+  FaceItr i = std::find(_faces.begin(), _faces.end(), f);
+  _faces.erase(i);
+}
+
+void MeshObj::face_to_triangles(uint32_t c) {
+  face_to_triangles(_color_to_face[c]);
+}
+
+void MeshObj::face_to_triangles(Face *F0) {
+  Edge* e0 = F0->edge();
+  Vert* o  = e0->vert();
+
+  while( e0->next()->next()->next() != e0 )
+    {
+      Edge* e1 = e0->next();
+      Edge* e2 = e1->next();
+
+      Face* f  = new Face(e1);
+
+      //---------New Edge------- vert - face ------ next - opp -
+      Edge* e3 = new Edge(          o,     f,         e1, NULL  );
+      Edge* e4 = new Edge( e2->vert(),    F0, e2->next(), e3    );
+      e0->next() = e4;
+      e2->next() = e3;
+      e3->opp()  = e4;
+      e1->face() = f;
+      e2->face() = f;
+
+      f->normal() = f->calculate_normal();
+      _register_face(f);
+      _edges.push_back(e3);
+      _edges.push_back(e4);
+    }
+}
+
 bool MeshObj::delete_face(uint32_t color) {
   Face* f = _color_to_face[color];
   if( f == NULL ) throw "MeshObj::delete_face(uint32_t): no face matched color.";
@@ -120,141 +289,6 @@ bool MeshObj::delete_face(uint32_t color) {
   _remove_face(f);
 
   return true;
-}
-
-void MeshObj::subdivide_faces(void) {
-  std::list<Vert*> new_verts;
-  split_all_edges(new_verts);
-
-  for( std::list<Vert*>::iterator v = new_verts.begin(); 
-       v != new_verts.end(); v++ )
-    {
-      bisect_subdiv_triangle(*v, (*v)->edge()->opp()->next());
-      if( (*v)->edge()->face() != NULL ) {
-	bisect_subdiv_triangle(*v, (*v)->edge());
-      }
-    }
-}
-
-Vert* MeshObj::split_edge(Edge *e) {
-  Edge* o = e->opp();
-  Vert* v = new Vert((e->vert()->loc() + o->vert()->loc())/2);
-
-  e->next() = new Edge(e->vert(), e->face(), e->next(), o);
-  o->next() = new Edge(o->vert(), o->face(), o->next(), e);
-  e->vert() = v;
-  o->vert() = v;
-  _edges.push_back(e->next());
-  _edges.push_back(o->next());
-
-  e->opp() = o->next();
-  o->opp() = e->next();
-  
-  v->edge() = (o->face() == NULL) ? o->next() : e->next();
-  v->normal() = v->calculate_normal();
-  _verts.push_back(v);
-
-  if( e->next()->opp()->next()->opp() != e )
-    throw "MeshObj::split_edge(Edge*): invalid cycle.";
-
-  return v;
-}
-
-void MeshObj::split_all_edges(list<Vert*>& v) {
-  std::set<Edge*> edges(_edges.begin(), _edges.end());
-  std::set<Edge*>::iterator itr;
-  
-  while( edges.size() > 0 ) {
-    itr = edges.begin();
-    edges.erase((*itr)->opp());
-    v.push_back( split_edge(*itr) );
-    edges.erase(itr);
-  }
-}
-
-void MeshObj::bisect_subdiv_triangle(Vert* v, Edge* e0) {  
-  Edge* e1 = e0->next();
-  Edge* e2 = e1->next()->next();
-
-  if( e2->next()->next()->next() == e0            //6 edges case
-      && e2->next()->next()->vert() == v ) {
-    e1 = e1->next();
-    e2 = e2->next()->next();
-  }
-  else if( e2->next() != e0 || e2->vert() != v )  //not 4 edges case
-    throw "MeshObj::bisect_subdiv_triangle(): unexpected surface.";
-
-  e1->face()->edge() = e1;
-  Face* f2 = new Face(e2);
-  Edge* e3 = new Edge(e2->vert(), e1->face(), e2->next(), NULL);
-  Edge* e4 = new Edge(e1->vert(),         f2, e1->next(),   e3);
-  e3->opp() = e4;
-
-  _edges.push_back(e3);
-  _edges.push_back(e4);
-
-  e1->next() = e3;
-  e2->next() = e4;
-
-  for( e2 = e4->next(); e2 != e4; e2 = e2->next() )
-    e2->face() = f2;
-
-  f2->normal() = f2->calculate_normal();
-  _register_face(f2);
-}
-
-void MeshObj::_register_face(Face *f) {
-  uint32_t key = (_color_to_face.size() == 0) ?
-    1 : _color_to_face.rbegin()->first + 1;
-  _color_to_face[key] = f;
-  _face_to_color[f] = key;
-  _faces.push_back(f);
-}
-
-void MeshObj::_remove_edge(Edge* e) {
-  EdgeItr i = std::find(_edges.begin(), _edges.end(), e);
-  _edges.erase(i);
-}
-
-void MeshObj::_remove_vert(Vert* v) {
-  VertItr i = std::find(_verts.begin(), _verts.end(), v);
-  _verts.erase(i);
-}
-
-void MeshObj::_remove_face(Face* f) {
-  FaceItr i = std::find(_faces.begin(), _faces.end(), f);
-  _faces.erase(i);
-}
-
-void MeshObj::face_to_triangles(uint32_t c) {
-  face_to_triangles(_color_to_face[c]);
-}
-
-void MeshObj::face_to_triangles(Face *F0) {
-  Edge* e0 = F0->edge();
-  Vert* o  = e0->vert();
-
-  while( e0->next()->next()->next() != e0 )
-    {
-      Edge* e1 = e0->next();
-      Edge* e2 = e1->next();
-
-      Face* f  = new Face(e1);
-
-      //---------New Edge------- vert - face ------ next - opp -
-      Edge* e3 = new Edge(          o,     f,         e1, NULL  );
-      Edge* e4 = new Edge( e2->vert(),    F0, e2->next(), e3    );
-      e0->next() = e4;
-      e2->next() = e3;
-      e3->opp()  = e4;
-      e1->face() = f;
-      e2->face() = f;
-
-      f->normal() = f->calculate_normal();
-      _register_face(f);
-      _edges.push_back(e3);
-      _edges.push_back(e4);
-    }
 }
 
 void MeshObj::construct(const MeshLoad::OBJMesh& m) {

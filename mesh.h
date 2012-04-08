@@ -25,6 +25,19 @@ class Vert;
 //-----------------------------------------------------------------------------
 
 class MeshObj {
+  typedef std::list<Vert*> VertContainer;
+  typedef std::list<Edge*> EdgeContainer;
+  typedef std::list<Face*> FaceContainer;
+  typedef VertContainer::iterator         VertItr;
+  typedef VertContainer::reverse_iterator VertRevItr;
+  typedef EdgeContainer::iterator         EdgeItr;
+  typedef EdgeContainer::reverse_iterator EdgeRevItr;
+  typedef FaceContainer::iterator         FaceItr;
+  typedef FaceContainer::reverse_iterator FaceRevItr;
+  VertContainer _verts;
+  EdgeContainer _edges;
+  FaceContainer _faces;
+  
  public:
   MeshObj();
   MeshObj(const MeshLoad::OBJMesh& m);
@@ -44,7 +57,7 @@ class MeshObj {
   /* ALTERATION INTERFACE */
   void convert_to_triangles(void);
   bool delete_face(uint32_t color);   //returns true on success, false on failure
-  void subdivide_faces(void);
+  void subdivide_faces(void);         //expects an all-triangle mesh
   
   /* returns the new vector which splits the edge 
    * (automatically adds that vector to the mesh) 
@@ -53,12 +66,13 @@ class MeshObj {
 
   /* splits all edges and puts the newly created vertices into the list (arg 1)
    */
-  void split_all_edges(list<Vert*>&);
+  void split_all_edges(std::list<Vert*>&);
 
   /* Bisects the triangle on the Edge side of the Vertex.
    * Expects 6 or 4 sides to the figure.
+   * If it finds a polygon with 6 sides, it adds the new edge to the to_flip list.
    */
-  void bisect_subdiv_triangle(Vert*, Edge*);
+  void bisect_subdiv_triangle(Vert*, Edge*, std::list<Edge*>& to_flip);
 
   void face_to_triangles(Face *);   //use the version with uint32_t arg instead
   void face_to_triangles(uint32_t);
@@ -66,19 +80,9 @@ class MeshObj {
   bool validate(void);
 
  private:
-  typedef std::list<Vert*> VertContainer;
-  typedef std::list<Edge*> EdgeContainer;
-  typedef std::list<Face*> FaceContainer;
-  typedef VertContainer::iterator         VertItr;
-  typedef VertContainer::reverse_iterator VertRevItr;
-  typedef EdgeContainer::iterator         EdgeItr;
-  typedef EdgeContainer::reverse_iterator EdgeRevItr;
-  typedef FaceContainer::iterator         FaceItr;
-  typedef FaceContainer::reverse_iterator FaceRevItr;
-  VertContainer _verts;
-  EdgeContainer _edges;
-  FaceContainer _faces;
-  
+  // Performs an edge flip. Expects the edge to be between two triangles.
+  void _edge_flip(Edge*);
+
   // faces are ID'd by a unique RGBA value stored as a CVec4T
   std::map<uint32_t, Face*> _color_to_face;
   std::map<Face*, uint32_t> _face_to_color;
@@ -89,7 +93,6 @@ class MeshObj {
   void _remove_face(Face*);
 
   void construct(const MeshLoad::OBJMesh &);
-
 };
 
 //-----------------------------------------------------------------------------
