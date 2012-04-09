@@ -1,6 +1,8 @@
 #ifndef __MESH_H__
 #define __MESH_H__
 
+#define _DEBUG if(false)
+
 #include <cstddef>         //for NULL
 #include <algorithm>
 #include <list>
@@ -25,18 +27,15 @@ class Vert;
 //-----------------------------------------------------------------------------
 
 class MeshObj {
-  typedef std::list<Vert*> VertContainer;
-  typedef std::list<Edge*> EdgeContainer;
-  typedef std::list<Face*> FaceContainer;
-  typedef VertContainer::iterator         VertItr;
-  typedef VertContainer::reverse_iterator VertRevItr;
-  typedef EdgeContainer::iterator         EdgeItr;
-  typedef EdgeContainer::reverse_iterator EdgeRevItr;
-  typedef FaceContainer::iterator         FaceItr;
-  typedef FaceContainer::reverse_iterator FaceRevItr;
-  VertContainer _verts;
-  EdgeContainer _edges;
-  FaceContainer _faces;
+  typedef           std::list<Vert*>       VertContainer;
+  typedef           std::list<Edge*>       EdgeContainer;
+  typedef           std::list<Face*>       FaceContainer;
+  typedef VertContainer::iterator          VertItr;
+  typedef VertContainer::reverse_iterator  VertRevItr;
+  typedef EdgeContainer::iterator          EdgeItr;
+  typedef EdgeContainer::reverse_iterator  EdgeRevItr;
+  typedef FaceContainer::iterator          FaceItr;
+  typedef FaceContainer::reverse_iterator  FaceRevItr;
   
  public:
   MeshObj();
@@ -93,6 +92,10 @@ class MeshObj {
   void _remove_face(Face*);
 
   void construct(const MeshLoad::OBJMesh &);
+
+  VertContainer _verts;
+  EdgeContainer _edges;
+  FaceContainer _faces;
 };
 
 //-----------------------------------------------------------------------------
@@ -176,6 +179,7 @@ class Vert {
 
   //lists
   list<Face*> list_faces(void) const;
+  int count_adjacent(void) const;
   
   friend std::ostream& operator << (std::ostream& s, const Vert& v);
 
@@ -184,6 +188,5 @@ class Vert {
   Vec3f _normal;
   Edge *_edge;
 };
-
 
 #endif

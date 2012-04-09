@@ -53,9 +53,24 @@ void MeshObj::convert_to_triangles(void) {
 }
 
 void MeshObj::subdivide_faces(void) {
+  VertContainer old_verts(_verts);
+
   // split all edges
   std::list<Vert*> new_verts;
   split_all_edges(new_verts);
+  
+  // adjust the new vertices' locations
+  for( std::list<Vert*>::iterator i = new_verts.begin();
+       i != new_verts.end(); i++ )
+    {
+      Vert* v = *i;
+      if( v->edge()->face() == NULL ) continue;
+      v->loc() = 
+	0.375 * (v->edge()->vert()->loc() + 
+		 v->edge()->opp()->next()->vert()->loc()) +
+	0.125 * (v->edge()->next()->vert()->loc() + 
+		 v->edge()->opp()->next()->next()->vert()->loc());
+    }
 
   // split all triangles into 4 triangles
   std::list<Edge*> to_flip;
@@ -74,6 +89,36 @@ void MeshObj::subdivide_faces(void) {
     {
       _edge_flip(*i);
     }
+
+  // Adjust old vertices' locations
+  for( VertItr i = old_verts.begin(); i != old_verts.end(); i++ )
+    {
+      Vert* v = *i;
+      Vec3f sum_new(0,0,0);
+      Edge* s = v->edge();  Edge* e = s;
+      int k = 0;
+      do {
+	sum_new += e->vert()->loc();
+	e = e->opp()->next();
+	k++;
+      } while( e != s );
+
+      if( k == 2 ) {
+	v->loc() = sum_new * 0.25 + v->loc() * 0.5;
+	continue;
+      }
+      if( k < 2 ) 
+	throw "MeshObj::subdivide_faces(): unexpected number of adjacent vertices";
+
+      float a = (k > 3) ? 3.0/8 / k : 3/16;
+      v->loc() = (1.0 - a * k * 8/5) * v->loc() + a * 8/5 * sum_new;
+    }
+
+  // reclaculate normals
+  for( FaceItr i = _faces.begin(); i != _faces.end(); i++ )
+    (*i)->normal() = (*i)->calculate_normal();
+  for( VertItr i = _verts.begin(); i != _verts.end(); i++ ) 
+    (*i)->normal() = (*i)->calculate_normal();
 }
 
 void MeshObj::split_all_edges(std::list<Vert*>& v) {
@@ -495,6 +540,13 @@ list<Face*> Vert::list_faces(void) const {
   return l;
 }
 
+int Vert::count_adjacent(void) const {
+  Edge* e = _edge->opp()->next();
+  int i = 1;
+  while( e != _edge ) { e = e->opp()->next(); i++; }
+  return i;
+}
+
 std::ostream& operator << (std::ostream& s, const Vert& v) {
   s << v._loc;  return s;
 }
@@ -505,71 +557,71 @@ bool MeshObj::validate(void) {
   bool ok = true;
   for( VertItr i = _verts.begin(); i != _verts.end(); i++ ) {
     Vert* v = *i;
-    cout << "\nVert: " << v << " || ";
+    _DEBUG cout << "\nVert: " << v << " || ";
 
     // check vert's edge.opp points back to vert
     if( v->edge()->opp()->vert() != v ) {
-      ok = false; cout << "x ";
-    } else cout << ". ";
+      ok = false; _DEBUG cout << "x ";
+    } else _DEBUG cout << ". ";
   }
 
   for( EdgeItr i = _edges.begin(); i != _edges.end(); i++ ) {
     Edge* e = *i;
-    cout << "\nEdge: " << e << " || ";
+    _DEBUG cout << "\nEdge: " << e << " || ";
     
     // check pointing to self
     if( e->next() == e ) {
-      ok = false;  cout << "x ";
-    } else cout << ". ";
+      ok = false;  _DEBUG cout << "x ";
+    } else _DEBUG  cout << ". ";
 
     // check border's next
     if( e->face() == NULL && e->next()->face() != NULL ) {
-      ok = false;  cout << "x ";
-    } else cout << ". ";
+      ok = false;  _DEBUG cout << "x ";
+    } else _DEBUG cout << ". ";
     
     // check border's vert
     if( e->face() == NULL && e->vert()->edge()->face() != NULL ) {
-      ok = false;  cout << "x ";
-    } else cout << ". ";
+      ok = false;  _DEBUG cout << "x ";
+    } else _DEBUG cout << ". ";
 
     // check border's next = vert.edge
     if( e->face() == NULL && e->next() != e->vert()->edge() ) {
-      ok = false;  cout << "x ";
-    } else cout << ". ";
+      ok = false;  _DEBUG cout << "x ";
+    } else _DEBUG cout << ". ";
 
     // check opposites
     if( e->opp()->opp() != e ) {
-      ok = false;  cout << "x ";
-    } else cout << ". ";
+      ok = false;  _DEBUG cout << "x ";
+    } else _DEBUG cout << ". ";
 
     // check face == .next.face
     if( e->face() != e->next()->face() ) {
-      ok = false;  cout << "x ";
-    } else cout << ". ";
+      ok = false;  _DEBUG cout << "x ";
+    } else _DEBUG cout << ". ";
 
     if( e->face() == NULL ) { //|| e->opp()->face() == NULL ) {
-      cout << ":";  std::flush(cout);
+      _DEBUG cout << ":";  std::flush(cout);
       for( Edge* t = e->next(); t->next() != e; t = t->next() ) 
-      cout << ".";
-    } else cout << "NA";
+	;_DEBUG cout << ".";
+    } else _DEBUG cout << "NA";
   }
 
   for( FaceItr i = _faces.begin(); i != _faces.end(); i++ ) {
     Face* f = *i;
-    cout << "\nFace: " << f << " ";
+    _DEBUG cout << "\nFace: " << f << " ";
 
     Edge* e = f->edge(); 
     do {
       if( e->face() != f ) { cout << "x"; ok = false; }
-      else cout << ".";  
-      std::flush(cout);
+      else _DEBUG cout << ".";  
+      _DEBUG std::flush(cout);
       e = e->next();
     } while(e != f->edge());
   }  
-  cout << "\nface count: " << _faces.size();
-  cout << "\nedge count: " << _edges.size();
-  cout << "\nvert count: " << _verts.size();
+  _DEBUG cout << "\nface count: " << _faces.size();
+  _DEBUG cout << "\nedge count: " << _edges.size();
+  _DEBUG cout << "\nvert count: " << _verts.size();
 
-  cout << endl;
+  _DEBUG cout << endl;
   return ok;
 }
