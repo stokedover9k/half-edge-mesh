@@ -129,19 +129,28 @@ void Input::MouseMotion(int x, int y) {
 void Input::Keyboard(unsigned char key, int x, int y) {
   switch( key )
     {
-    case 'n':  Draw::toggle_mode(Draw::NORMALS_MODE);              break;
-    case 'x':  
-      Draw::mesh.face_to_triangles(selected_face_color);
-      if( !Draw::mesh.validate() ) 
-	throw "Input::Keyboard(): face split broke mesh.";         break;
-    case 't':  
+    case 'n':  Draw::toggle_mode(Draw::NORMALS_MODE);              
+      break;
+    case 'x':
+      if( selected_face_color > 0 ) {
+	Draw::mesh.face_to_triangles(selected_face_color);
+	if( !Draw::mesh.validate() ) 
+	  throw "Input::Keyboard(): face split broke mesh.";
+	selected_face_color = 0;
+      }
+      break;
+    case 't':
       Draw::mesh.convert_to_triangles();                  
       if( !Draw::mesh.validate() ) 
-	throw "Input::Keyboard(): all faces split broke mesh.";    break;
-    case 'd':  
-      if( Draw::mesh.delete_face(selected_face_color) ) {
-	if( ! Draw::mesh.validate() ) 
-	  throw "Input::Keyboard(): delete broke mesh";
+	throw "Input::Keyboard(): all faces split broke mesh.";    
+      break;
+    case 'd':
+      if( selected_face_color > 0 ) {
+	if( Draw::mesh.delete_face(selected_face_color) ) {
+	  if( ! Draw::mesh.validate() ) 
+	    throw "Input::Keyboard(): delete broke mesh";
+	}
+	selected_face_color = 0;
       }
       break;
     case 's':
@@ -152,8 +161,9 @@ void Input::Keyboard(unsigned char key, int x, int y) {
       Draw::mesh.subdivide_faces();
       if( !Draw::mesh.validate() ) 
 	throw "Input::Keyboard(): Loop subdivision broke mesh.";   
-                                                                   break;
-    case 'v':  Draw::mesh.validate();                              break;
+      break;
+    case 'v':  Draw::mesh.validate();
+      break;
 
     default: ;
     }

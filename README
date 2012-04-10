@@ -1,0 +1,35 @@
+OS: Linux
+
+COMPILE:
+execute "make" or:
+
+g++ -c params.cpp
+g++ -c mesh.cpp
+g++ -c io.cpp
+g++ -c mesh-loader.cpp
+g++ -c main.cpp
+g++ -lGL -lGLU -lglut params.o io.o mesh.o mesh-loader.o main.o  -o a.out
+
+RUN:
+./a.out [mesh_object_file.obj="./obj/spaceship.obj"]
+
+
+-------------------------------------------------------------------------------
+USAGE:
+
+SELECT: Click on a polygon of the mesh. Selected polygon is colored red.
+
+ROTATE: Click anywhere on the wire sphere and drag.
+
+DELETE: Click 'd' to delete the selected surface.
+
+TRIANGLES: Click 't' to split all faces into triangles. Additionally,
+           click 'x' to split only the currently selected surface.
+
+SUBDIVISION: Click 's' to split all triangles (if the mesh is not
+             an all-triangle mesh, the operations equivalent to
+             pressing 't' is performed first) into four (4) new 
+             and adjust the vertices to smooth the surface.
+
+NORMALS MODE: Click 'n' to switch between per-surface and per-vertex
+              normals.
