@@ -162,15 +162,5 @@ inline CVec2T<F> abs( const CVec2T<F>& a ) {
   return CVec2T<F>( abs( a(0)),  abs( a(1)));
 }
 
-
-
-
 #endif	/* __CVEC2T_H__ */
-
-
-
-
-
-
-
 
